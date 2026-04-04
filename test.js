@@ -5,6 +5,11 @@ self.addEventListener('install', event => {
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+  console.log('request:', url.pathname);
+});
+
+self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
 
   if (url.pathname.includes('.txt')) {
     event.respondWith(
