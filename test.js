@@ -8,7 +8,7 @@ self.addEventListener('fetch', event => {
 
   if (url.pathname.endsWith('/1.txt')) {
     event.respondWith(
-      fetch('/2.txt')
+      fetch('/geometrydashdotcom/2.txt')
     );
   }
 });
