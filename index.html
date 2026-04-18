@@ -133,10 +133,6 @@
       min-width: 60px;
       text-align: right;
     }
-    .custom-input {
-      background: #333 !important;
-      border-left: 5px solid #00ff88 !important;
-    }
   </style>
 </head>
 
@@ -148,7 +144,6 @@
   </nav>
 
   <div id="levels" class="tab-content active">
-    <button class="level-btn custom-input" onclick="promptLevel()">Custom Level (from GD servers)</button>
     <button class="level-btn" onclick="loadLevel('-1')">Stereo Madness</button>
     <button class="level-btn" onclick="loadLevel('-2')">Back on Track</button>
     <button class="level-btn" onclick="loadLevel('-3')">Polargeist</button>
@@ -196,22 +191,7 @@
     }
 
     function loadLevel(id) {
-      window.location.href = `/geometrydashdotcom/game?id=${id}`;
-    }
-
-    function promptLevel() {
-      const id = prompt('Enter level ID:');
-      if (id === null) return;
-      const num = Number(id.trim());
-      if (!Number.isInteger(num)) {
-        alert('Invalid Level ID...');
-        return;
-      }
-      if (id.trim() === '') {
-        alert('Please enter a Level ID');
-      } else {
-        loadLevel(id);
-      }
+      window.location.href = `game/index.html?id=${id}#id=${id}`;
     }
   </script>
 </body>

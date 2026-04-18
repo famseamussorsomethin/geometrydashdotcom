@@ -4,88 +4,133 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Geometry Dash</title>
-    <link rel="icon" href="/geometrydashdotcom/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="../favicon.ico" type="image/x-icon">
     <style>
         * { margin: 0; padding: 0; }
-        body { overflow: hidden; background: black;}
+        body { overflow: hidden; background: black; }
         canvas { display: block; margin: 0 auto; }
+        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif; z-index: 9999; font-size: 24px; }
+        #loading span { margin-top: 16px; font-size: 14px; color: #888; }
     </style>
   <script>
-    var levelId = Number(new URLSearchParams(location.search).get('id')) || 1;
-    async function start() {
-      await navigator.serviceWorker.register('/geometrydashdotcom/worker.js');
-      await navigator.serviceWorker.ready;
+    var levelId = Number(new URLSearchParams(location.search).get('id')) || Number(new URLSearchParams(location.hash.replace('#', '')).get('id')) || 0;
+    if (levelId === 0) { location.href = '../index.html'; }
 
-      navigator.serviceWorker.controller?.postMessage({ levelId });
-
-      const script = document.createElement('script');
-      script.type = 'module';
-      script.src = './assets/index-game.js';
-      document.body.appendChild(script);
+    var officialLevels = [
+        "Stereo Madness", "Back on Track", "Polargeist", "Dry Out",
+        "Base After Base", "Cant Let Go", "Jumper", "Time Machine",
+        "Cycles", "xStep", "Clutterfunk", "Theory of Everything",
+        "Electroman Adventures", "Clubstep", "Electrodynamix", "Hexagon Force",
+        "Blast Processing", "Theory of Everything 2", "Geometrical Dominator",
+        "Deadlocked", "Fingerdash", "Dash", "Every End"
+    ];
+    if (levelId < 0) {
+        window.levelName = officialLevels[Math.abs(levelId) - 1] || "Unknown";
     }
-    function updateLevelName() {
-      const officialLevels = [
-          "Stereo Madness",
-          "Back on Track",
-          "Polargeist",
-          "Dry Out",
-          "Base After Base",
-          "Cant Let Go",
-          "Jumper",
-          "Time Machine",
-          "Cycles",
-          "xStep",
-          "Clutterfunk",
-          "Theory of Everything",
-          "Electroman Adventures",
-          "Clubstep",
-          "Electrodynamix",
-          "Hexagon Force",
-          "Blast Processing",
-          "Theory of Everything 2",
-          "Geometrical Dominator",
-          "Deadlocked",
-          "Fingerdash",
-          "Dash",
-          "Every End"
-      ];
-      if (levelId < 0) {
-        const index = Math.abs(levelId) - 1;
-        if (officialLevels[index]) {
-            window.levelName = officialLevels[index];
-        } else {
-            window.levelName = "Unknown";
+
+    function findAsset(url) {
+        if (!window.__LA__) return null;
+        if (!url || typeof url !== 'string') return null;
+        if (window.__LA__[url]) return window.__LA__[url];
+        var parts = url.split('/');
+        for (var i = Math.max(0, parts.length - 3); i < parts.length; i++) {
+            var candidate = parts.slice(i).join('/');
+            if (window.__LA__[candidate]) return window.__LA__[candidate];
         }
-      }
+        return null;
     }
-    start();
-    setTimeout(updateLevelName, 1000);
-  </script>
-  <script>
-    let fix = false;
-    navigator.serviceWorker.addEventListener("message", (event) => {
-      if (event.data.type === "invalid-id") {
-        if (fix) return;
-        fix = true;
-        alert("Level doesn't exist... are you sure you typed the ID correctly?");
-        window.location.href = "https://lasokar.github.io/geometrydashdotcom/";
-      }
-      if (event.data.type === "rate-limit") {
-        if (fix) return;
-        fix = true;
-        alert("Site is currently being rate limited from GD servers, please try again later! (you may still use one of the default levels below)");
-        window.location.href = "https://lasokar.github.io/geometrydashdotcom/";
-      }
-      if (event.data.type === 'set-level-name') {
-        window.levelName = event.data.name;
-      }
+
+    function assetToDataURI(asset) {
+        if (asset.b) {
+            return 'data:' + asset.c + ';base64,' + asset.b;
+        } else {
+            return 'data:' + asset.c + ';charset=utf-8,' + encodeURIComponent(asset.t);
+        }
+    }
+
+    // Override XMLHttpRequest to serve local assets via data URIs
+    var _xhrOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+        var asset = findAsset(typeof url === 'string' ? url : String(url));
+        if (asset) {
+            arguments[1] = assetToDataURI(asset);
+        }
+        return _xhrOpen.apply(this, arguments);
+    };
+
+    // Override fetch to serve local assets via Response objects (fetch is blocked on file://)
+    var _origFetch = window.fetch;
+    window.fetch = function(input, init) {
+        var url;
+        if (typeof input === 'string') { url = input; }
+        else if (input instanceof Request) { url = input.url; }
+        else { url = String(input); }
+
+        var asset = findAsset(url);
+        if (asset) {
+            if (asset.b) {
+                var bin = atob(asset.b);
+                var arr = new Uint8Array(bin.length);
+                for (var j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
+                return Promise.resolve(new Response(arr, { headers: { 'Content-Type': asset.c } }));
+            } else {
+                return Promise.resolve(new Response(asset.t, { headers: { 'Content-Type': asset.c } }));
+            }
+        }
+
+        return _origFetch(input, init);
+    };
+
+    // Load local asset data via <script> tags (works on file://)
+    function loadScript(src) {
+        return new Promise(function(resolve, reject) {
+            var s = document.createElement('script');
+            s.src = src;
+            s.onload = resolve;
+            s.onerror = function() { reject(new Error('Failed to load ' + src)); };
+            document.head.appendChild(s);
+        });
+    }
+
+    function showError(msg) {
+        var el = document.getElementById('loading');
+        if (el) { el.innerHTML = '<div>' + msg + '</div>'; }
+    }
+
+    // Show loading screen
+    document.addEventListener('DOMContentLoaded', function() {
+        var ld = document.createElement('div');
+        ld.id = 'loading';
+        ld.innerHTML = 'Loading...<span>Please wait</span>';
+        document.body.appendChild(ld);
     });
+
+    // Load assets then start game
+    var absId = Math.abs(levelId);
+    var isOfficial = levelId < 0;
+
+    loadScript('assets/local/common.js')
+        .then(function() {
+            if (isOfficial) {
+                return loadScript('assets/local/level-' + absId + '.js');
+            }
+            return Promise.resolve();
+        })
+        .then(function() {
+            var ld = document.getElementById('loading');
+            if (ld) ld.remove();
+            var s = document.createElement('script');
+            s.src = './assets/index-game.js';
+            document.body.appendChild(s);
+        })
+        .catch(function(e) {
+            console.error(e);
+            showError('Asset files not found!');
+        });
   </script>
   <script>
-    // ResizeObserver catches iframe size changes that window.resize misses
-    // (e.g. parent window maximize, snap, title bar drag)
-    new ResizeObserver(() => {
-      window.dispatchEvent(new Event('resize'));
+    new ResizeObserver(function() {
+        window.dispatchEvent(new Event('resize'));
     }).observe(document.documentElement);
   </script>
 </head>
